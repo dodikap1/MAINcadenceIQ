@@ -31,6 +31,7 @@
 }
 
 body {
+  flex-direction: column;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: var(--bg2);
   color: var(--text);
@@ -751,6 +752,139 @@ body {
   margin-top: 6px;
   line-height: 1.4;
 }
+
+/* TASKBAR */
+.taskbar {
+  height: 52px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.task-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.task-input {
+  width: 240px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: var(--bg2);
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.task-input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.task-input::placeholder { color: var(--text3); }
+
+.task-add-btn {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: white;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.task-add-btn:hover { background: #1d4ed8; }
+
+.task-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.tasks-scroll {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tasks-scroll::-webkit-scrollbar { display: none; }
+
+.task-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  background: var(--bg2);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: default;
+  transition: all 0.15s;
+}
+
+.task-chip.done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: var(--text3);
+  text-decoration: line-through;
+}
+
+.task-chip input[type=checkbox] {
+  width: 13px; height: 13px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.task-chip-delete {
+  width: 16px; height: 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text3);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.1s;
+  flex-shrink: 0;
+}
+
+.task-chip-delete:hover { background: var(--bg3); color: var(--text); }
+
+.tasks-empty {
+  font-size: 12.5px;
+  color: var(--text3);
+  white-space: nowrap;
+  font-style: italic;
+}
 </style>
 </head>
 <body>
@@ -1377,5 +1511,80 @@ renderMini();
 setInterval(positionCurrentTime,60000);
 setInterval(()=>{renderCalendar();},300000);
 </script>
+
+<!-- TASKBAR -->
+<div class="taskbar">
+  <div class="task-input-wrap">
+    <input type="text" class="task-input" id="task-input" placeholder="Add a quick task..." onkeydown="handleTaskKey(event)" maxlength="80" />
+    <button class="task-add-btn" onclick="addTask()" title="Add task">+</button>
+  </div>
+  <div class="task-divider"></div>
+  <div class="tasks-scroll" id="tasks-scroll">
+    <span class="tasks-empty" id="tasks-empty">No tasks yet — type one above</span>
+  </div>
+</div>
+
+<script>
+// ─── TASKS ────────────────────────────────────────────────────
+let tasks = JSON.parse(localStorage.getItem('cadenceiq-tasks') || '[]');
+
+function saveTasks() {
+  localStorage.setItem('cadenceiq-tasks', JSON.stringify(tasks));
+}
+
+function renderTasks() {
+  const scroll = document.getElementById('tasks-scroll');
+  const empty = document.getElementById('tasks-empty');
+  const chips = scroll.querySelectorAll('.task-chip');
+  chips.forEach(c => c.remove());
+
+  if (tasks.length === 0) {
+    empty.style.display = 'inline';
+  } else {
+    empty.style.display = 'none';
+    tasks.forEach(task => {
+      const chip = document.createElement('div');
+      chip.className = 'task-chip' + (task.done ? ' done' : '');
+      chip.innerHTML = `
+        <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask('${task.id}')" />
+        <span>${task.text}</span>
+        <button class="task-chip-delete" onclick="deleteTask('${task.id}')" title="Remove">&#x2715;</button>
+      `;
+      scroll.appendChild(chip);
+    });
+  }
+}
+
+function addTask() {
+  const input = document.getElementById('task-input');
+  const text = input.value.trim();
+  if (!text) return;
+  tasks.push({ id: Date.now().toString(), text, done: false });
+  saveTasks();
+  renderTasks();
+  input.value = '';
+  // Scroll to end
+  const scroll = document.getElementById('tasks-scroll');
+  setTimeout(() => { scroll.scrollLeft = scroll.scrollWidth; }, 50);
+}
+
+function toggleTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (task) { task.done = !task.done; saveTasks(); renderTasks(); }
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  saveTasks();
+  renderTasks();
+}
+
+function handleTaskKey(e) {
+  if (e.key === 'Enter') addTask();
+}
+
+renderTasks();
+</script>
+
 </body>
 </html>
